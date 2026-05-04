@@ -5,6 +5,7 @@ import (
 	user "Calculate_modify/User"
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -25,17 +26,20 @@ func main() {
 		return
 	}
 
-	fmt.Println("Доступные операции: +, -, *, /")
-	fmt.Println("Формат ввода: 2 + 2")
+	fmt.Println("Доступные операции: +, -, *, /, ^, %")
+	fmt.Println("Примеры ввода: 2+2, 10-3, 4*5, 15/3, 45^2, 12%5")
+	fmt.Println("Можно вводить с пробелами или без")
 	fmt.Println("Для выхода введите 'exit'")
 	fmt.Println("Для просмотра истории введите 'history'")
 	fmt.Println()
 
-	// Основной цикл калькулятора
 	for {
 		fmt.Print("> ")
 		input, _ := reader.ReadString('\n')
 		input = strings.TrimSpace(input)
+
+		// Удаляем ВСЕ пробелы из строки (чтобы "2 + 2" тоже работало)
+		inputNoSpaces := strings.ReplaceAll(input, " ", "")
 
 		if input == "exit" {
 			fmt.Println("До свидания!")
@@ -43,7 +47,6 @@ func main() {
 		}
 
 		if input == "history" {
-			// Показываем историю
 			err := history.ShowHistory(userData.FilePath, 0)
 			if err != nil {
 				fmt.Println("История пуста или ошибка чтения")
@@ -51,17 +54,16 @@ func main() {
 			continue
 		}
 
-		// Вычисляем выражение
-		result, err := calculate(input)
+		// Вычисляем (используем строку без пробелов)
+		result, err := calculate(inputNoSpaces)
 		if err != nil {
 			fmt.Printf("Ошибка: %v\n", err)
 			continue
 		}
 
-		// Выводим результат
 		fmt.Printf("Результат: %.2f\n", result)
 
-		// Сохраняем в историю
+		// Сохраняем в историю исходный ввод (с пробелами, если они были)
 		err = history.AddRecord(userData.FilePath, input, result)
 		if err != nil {
 			fmt.Printf("Не удалось сохранить историю: %v\n", err)
@@ -69,27 +71,54 @@ func main() {
 	}
 }
 
-// calculate парсит и вычисляет простое арифметическое выражение
+// calculate принимает строку без пробелов типа "2+2" или "10/3"
 func calculate(input string) (float64, error) {
-	// Разделяем пробелами: "2 + 2" -> ["2", "+", "2"]
-	parts := strings.Fields(input)
-	if len(parts) != 3 {
-		return 0, fmt.Errorf("неверный формат. Используйте: \"число оператор число\"")
+	// Ищем позицию оператора в строке
+	var operator string
+	var pos int // позиция оператора
+
+	// Проверяем наличие каждого оператора
+	for i, ch := range input {
+		switch ch {
+		case '+', '-', '*', '/', '^', '%':
+			operator = string(ch)
+			pos = i
+			break
+		}
+
+		// Проверяем, не является ли минус первым символом
+		if operator == "-" && pos == 0 {
+			// Это отрицательное число, ищем следующий оператор
+			continue
+		}
+
+		// Если нашли оператор - выходим из цикла
+		if operator != "" {
+			break
+		}
 	}
 
-	// Парсим числа
-	a, err := strconv.ParseFloat(parts[0], 64)
-	if err != nil {
-		return 0, fmt.Errorf("первый аргумент не число: %v", parts[0])
+	// Если оператор не найден
+	if operator == "" {
+		return 0, fmt.Errorf("не найден оператор (+, -, *, /)")
 	}
 
-	b, err := strconv.ParseFloat(parts[2], 64)
+	// Разделяем левую и правую части
+	leftStr := input[:pos]    // часть до оператора
+	rightStr := input[pos+1:] // часть после оператора
+
+	// Преобразуем в числа
+	a, err := strconv.ParseFloat(leftStr, 64)
 	if err != nil {
-		return 0, fmt.Errorf("второй аргумент не число: %v", parts[2])
+		return 0, fmt.Errorf("ошибка в левом числе: %v", leftStr)
+	}
+
+	b, err := strconv.ParseFloat(rightStr, 64)
+	if err != nil {
+		return 0, fmt.Errorf("ошибка в правом числе: %v", rightStr)
 	}
 
 	// Выполняем операцию
-	operator := parts[1]
 	switch operator {
 	case "+":
 		return a + b, nil
@@ -102,6 +131,24 @@ func calculate(input string) (float64, error) {
 			return 0, fmt.Errorf("деление на ноль")
 		}
 		return a / b, nil
+	case "^": // возводим в степень
+		return math.Pow(a, b), nil
+	case "%":
+		// Остаток от деления работает только с целыми числами
+		// Преобразуем float64 в int для операции %
+		aInt := int(a)
+		bInt := int(b)
+
+		if bInt == 0 {
+			return 0, fmt.Errorf("деление на ноль")
+		}
+
+		// Проверяем, что числа были целыми
+		if float64(aInt) != a || float64(bInt) != b {
+			return 0, fmt.Errorf("оператор %% работает только с целыми числами")
+		}
+
+		return float64(aInt % bInt), nil
 	default:
 		return 0, fmt.Errorf("неизвестный оператор: %v", operator)
 	}
