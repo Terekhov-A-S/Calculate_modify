@@ -74,7 +74,7 @@ func calculate(input string) (float64, error) {
 	// Разделяем пробелами: "2 + 2" -> ["2", "+", "2"]
 	parts := strings.Fields(input)
 	if len(parts) != 3 {
-		return 0, fmt.Errorf("неверный формат. Используйте: число оператор число")
+		return 0, fmt.Errorf("неверный формат. Используйте: \"число оператор число\"")
 	}
 
 	// Парсим числа
