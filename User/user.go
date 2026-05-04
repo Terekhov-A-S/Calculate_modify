@@ -16,7 +16,7 @@ type UserData struct {
 // CheckOrCreateUser проверяет, есть ли пользователь, если нет - создаёт
 func CheckOrCreateUser(username string) (UserData, error) {
 	// Проверяем, существует ли файл users.txt
-	usersFile := "users.txt"
+	usersFile := "User/users.txt"
 
 	// Открываем файл (создаём, если нет)
 	file, err := os.OpenFile(usersFile, os.O_RDWR|os.O_CREATE, 0666)
