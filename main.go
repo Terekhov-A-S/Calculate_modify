@@ -1,8 +1,7 @@
 package main
 
 import (
-	history "Calculate_modify/History"
-	user "Calculate_modify/User"
+	"Calculate_modify/system"
 	"bufio"
 	"fmt"
 	"math"
@@ -20,14 +19,16 @@ func main() {
 	username := strings.TrimSpace(usernameInput)
 
 	// Проверяем/создаём пользователя
-	userData, err := user.CheckOrCreateUser(username)
+	userData, err := system.CheckOrCreateUser(username)
 	if err != nil {
 		fmt.Printf("Ошибка: %v\n", err)
+		fmt.Println("Нажмите Enter для выхода...")
+		fmt.Scanln()
 		return
 	}
 
-	fmt.Println("Доступные операции: +, -, *, /, ^, %")
-	fmt.Println("Примеры ввода: 2+2, 10-3, 4*5, 15/3, 45^2, 12%5")
+	fmt.Println("Доступные операции: +, -, *, /, % (остаток от деления)")
+	fmt.Println("Примеры ввода: 2+2, 10-3, 4*5, 15/3, 10%3, 12^2")
 	fmt.Println("Можно вводить с пробелами или без")
 	fmt.Println("Для выхода введите 'exit'")
 	fmt.Println("Для просмотра истории введите 'history'")
@@ -47,9 +48,9 @@ func main() {
 		}
 
 		if input == "history" {
-			err := history.ShowHistory(userData.FilePath, 0)
+			err := system.ShowHistory(userData.FilePath, 0)
 			if err != nil {
-				fmt.Println("История пуста или ошибка чтения")
+				fmt.Printf("Ошибка при чтении истории: %v\n", err)
 			}
 			continue
 		}
@@ -64,50 +65,39 @@ func main() {
 		fmt.Printf("Результат: %.2f\n", result)
 
 		// Сохраняем в историю исходный ввод (с пробелами, если они были)
-		err = history.AddRecord(userData.FilePath, input, result)
+		err = system.AddRecord(userData.FilePath, input, result)
 		if err != nil {
 			fmt.Printf("Не удалось сохранить историю: %v\n", err)
 		}
 	}
 }
 
-// calculate принимает строку без пробелов типа "2+2" или "10/3"
+// calculate принимает строку без пробелов типа "2+2" или "10/3" или "10%3"
 func calculate(input string) (float64, error) {
 	// Ищем позицию оператора в строке
 	var operator string
-	var pos int // позиция оператора
+	var pos int
 
 	// Проверяем наличие каждого оператора
 	for i, ch := range input {
 		switch ch {
-		case '+', '-', '*', '/', '^', '%':
+		case '+', '-', '*', '/', '%', '^':
 			operator = string(ch)
 			pos = i
 			break
 		}
-
-		// Проверяем, не является ли минус первым символом
-		if operator == "-" && pos == 0 {
-			// Это отрицательное число, ищем следующий оператор
-			continue
-		}
-
-		// Если нашли оператор - выходим из цикла
 		if operator != "" {
 			break
 		}
 	}
 
-	// Если оператор не найден
 	if operator == "" {
-		return 0, fmt.Errorf("не найден оператор (+, -, *, /)")
+		return 0, fmt.Errorf("не найден оператор (+, -, *, /, %%)")
 	}
 
-	// Разделяем левую и правую части
-	leftStr := input[:pos]    // часть до оператора
-	rightStr := input[pos+1:] // часть после оператора
+	leftStr := input[:pos]
+	rightStr := input[pos+1:]
 
-	// Преобразуем в числа
 	a, err := strconv.ParseFloat(leftStr, 64)
 	if err != nil {
 		return 0, fmt.Errorf("ошибка в левом числе: %v", leftStr)
@@ -118,7 +108,6 @@ func calculate(input string) (float64, error) {
 		return 0, fmt.Errorf("ошибка в правом числе: %v", rightStr)
 	}
 
-	// Выполняем операцию
 	switch operator {
 	case "+":
 		return a + b, nil
@@ -131,11 +120,10 @@ func calculate(input string) (float64, error) {
 			return 0, fmt.Errorf("деление на ноль")
 		}
 		return a / b, nil
-	case "^": // возводим в степень
+	case "^":
 		return math.Pow(a, b), nil
+
 	case "%":
-		// Остаток от деления работает только с целыми числами
-		// Преобразуем float64 в int для операции %
 		aInt := int(a)
 		bInt := int(b)
 
@@ -143,7 +131,6 @@ func calculate(input string) (float64, error) {
 			return 0, fmt.Errorf("деление на ноль")
 		}
 
-		// Проверяем, что числа были целыми
 		if float64(aInt) != a || float64(bInt) != b {
 			return 0, fmt.Errorf("оператор %% работает только с целыми числами")
 		}
